@@ -2,31 +2,32 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Tamil Voice Navigation</title>
+  <title>Blind Navigation</title>
 </head>
 <body>
-  <h2>Blind Navigation – Tamil Voice</h2>
-  <video id="video" width="100%" autoplay></video>
-  <br><br>
-  <button onclick="startCamera()">Start Camera</button>
+  <h1>Blind Navigation Demo</h1>
+  <video id="camera" width="320" height="240" autoplay></video>
+
+  <!-- Button to manually test Tamil voice -->
+  <button onclick="speakTamil('முன்னே செல்லலாம்')">Test Voice</button>
 
   <script>
-    function startCamera() {
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then(stream => {
-          document.getElementById("video").srcObject = stream;
-          speakTamil("கேமரா தொடங்கப்பட்டுள்ளது");
-        })
-        .catch(err => {
-          alert("Camera access denied");
-        });
-    }
+    // Access camera (back if available)
+    const video = document.getElementById('camera');
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then(stream => { video.srcObject = stream; })
+      .catch(err => { alert("Camera permission required!"); });
 
-    function speakTamil(text) {
+    // Function to speak Tamil
+    function speakTamil(text){
       const msg = new SpeechSynthesisUtterance(text);
       msg.lang = "ta-IN";
       window.speechSynthesis.speak(msg);
     }
+
+    // Optional auto-test: speaks after 3 sec
+    setTimeout(() => { speakTamil("முன்னே செல்லலாம்"); }, 3000);
   </script>
 </body>
 </html>
+
