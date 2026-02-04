@@ -21,9 +21,9 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 let model;
 
-let lastMessage = "";
+let lastSpokenObjects = [];
 let lastSpeakTime = 0;
-const speakDelay = 2000;
+const speakDelay = 2000; // minimum 2 seconds between messages
 
 // English → Tamil mapping
 const tamilNames = {
@@ -36,14 +36,18 @@ const tamilNames = {
   table: "மேசை"
 };
 
-// Tamil Voice
-function speak(text) {
+// Tamil Voice with repeat control
+function speak(objects) {
   const now = Date.now();
-  if (now - lastSpeakTime < speakDelay) return;
-  if (text === lastMessage) return;
-  lastMessage = text;
+  if (now - lastSpeakTime < speakDelay) return; // avoid rapid repeats
+
+  const text = objects.join(", ");
+  if (text === lastSpokenObjects.join(", ")) return; // avoid same message
+
+  lastSpokenObjects = objects;
   lastSpeakTime = now;
-  const msg = new SpeechSynthesisUtterance(text);
+
+  const msg = new SpeechSynthesisUtterance("முன்னால் " + text + " உள்ளது");
   msg.lang = "ta-IN";
   window.speechSynthesis.speak(msg);
 }
@@ -61,7 +65,7 @@ async function startCamera() {
 // Load Model
 async function loadModel() {
   model = await cocoSsd.load();
-  speak("கேமரா தயார். முன் உள்ள பொருட்களை கண்டறிகிறேன்");
+  speak(["கேமரா தயார். முன் உள்ள பொருட்களை கண்டறிகிறேன்"]);
   detectObjects();
 }
 
@@ -72,8 +76,7 @@ async function detectObjects() {
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
   const predictions = await model.detect(video);
-
-  const instructions = [];
+  const objectsToSpeak = [];
 
   predictions.forEach(pred => {
     const [x, y, width, height] = pred.bbox;
@@ -102,11 +105,11 @@ async function detectObjects() {
     // Object name Tamil
     const objTamil = tamilNames[pred.class] || pred.class;
 
-    instructions.push(`${horizontal} ${objTamil} ${distanceMsg}`);
+    objectsToSpeak.push(`${horizontal} ${objTamil} ${distanceMsg}`);
   });
 
-  if(instructions.length > 0){
-    speak(instructions.join(". "));
+  if(objectsToSpeak.length > 0){
+    speak(objectsToSpeak);
   }
 
   requestAnimationFrame(detectObjects);
