@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <title>Blind Navigation</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.16.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+
 </head>
 <body>
   <h1>Blind Navigation Demo</h1>
@@ -12,6 +15,18 @@
   <button onclick="speakTamil('முன்னே செல்லலாம்')">Test Voice</button>
 
   <script>
+    let model;
+
+async function loadModel() {
+  model = await cocoSsd.load();
+  console.log("✅ AI Model Loaded");
+  speakTamil("AI மாடல் தயாராக உள்ளது");
+}
+
+window.onload = () => {
+  loadModel();
+};
+
     // Access camera (back if available)
     const video = document.getElementById('camera');
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
