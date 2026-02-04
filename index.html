@@ -49,7 +49,7 @@ function speak(objects) {
   lastSpokenObjects = objects;
   lastSpeakTime = now;
 
-  const msg = new SpeechSynthesisUtterance(text); // removed extra "முன்னால்"
+  const msg = new SpeechSynthesisUtterance(text); // NO extra "முன்னால்"
   msg.lang = "ta-IN";
   window.speechSynthesis.speak(msg);
 }
@@ -95,7 +95,7 @@ async function detectObjects() {
     // Determine horizontal position
     const centerX = x + width/2;
     let horizontal = centerX < canvas.width / 3 ? "இடது பக்கம்" :
-                     centerX > 2*canvas.width / 3 ? "வலது பக்கம்" : "முன்னே";
+                     centerX > 2*canvas.width / 3 ? "வலது பக்கம்" : "முன்ன்"; // FIXED here
 
     // Rough distance logic
     let distanceMsg = "";
