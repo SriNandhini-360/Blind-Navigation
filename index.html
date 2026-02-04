@@ -1,59 +1,117 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Blind Navigation</title>
+  <meta charset="UTF-8" />
+  <title>Blind Assistance - Live Object Detection</title>
 
-  <!-- TensorFlow -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.2.0/dist/tf.min.js"></script>
+  <!-- TensorFlow.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+
+  <!-- COCO-SSD model -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
   <style>
     body {
+      margin: 0;
       background: black;
-      color: white;
-      text-align: center;
-      font-family: Arial;
+      overflow: hidden;
     }
+
     video {
-      width: 100%;
-      height: auto;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
     }
   </style>
 </head>
 
 <body>
-  <h2>Live Object Detection</h2>
-  <p id="status">Loading model...</p>
 
   <video id="video" autoplay playsinline></video>
+  <canvas id="canvas"></canvas>
 
   <script>
     const video = document.getElementById("video");
-    const statusText = document.getElementById("status");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
 
+    let model;
+    let lastSpoken = "";
+
+    // 🎤 Tamil voice
+    function speak(text) {
+      if (text === lastSpoken) return;
+      lastSpoken = text;
+
+      const msg = new SpeechSynthesisUtterance(text);
+      msg.lang = "ta-IN";
+      window.speechSynthesis.speak(msg);
+    }
+
+    // 📷 Start camera
     async function startCamera() {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" }
+        video: { facingMode: "environment" },
+        audio: false
       });
+
       video.srcObject = stream;
+
+      return new Promise(resolve => {
+        video.onloadedmetadata = () => {
+          resolve();
+        };
+      });
     }
 
+    // 🤖 Load model
     async function loadModel() {
-      const model = await cocoSsd.load();
-      statusText.innerText = "Model loaded. Detecting...";
-
-      setInterval(async () => {
-        const predictions = await model.detect(video);
-        if (predictions.length > 0) {
-          statusText.innerText = "Detected: " + predictions[0].class;
-        } else {
-          statusText.innerText = "No object detected";
-        }
-      }, 1500);
+      model = await cocoSsd.load();
+      speak("கேமரா தயார். முன் உள்ள பொருட்களை கண்டறிகிறேன்");
+      detectObjects();
     }
 
-    startCamera();
-    loadModel();
+    // 👀 Detect objects
+    async function detectObjects() {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      const predictions = await model.detect(video);
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (predictions.length > 0) {
+        const objectName = predictions[0].class;
+        speak("முன்னால் " + objectName + " உள்ளது");
+      }
+
+      predictions.forEach(pred => {
+        ctx.strokeStyle = "lime";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(...pred.bbox);
+
+        ctx.fillStyle = "lime";
+        ctx.font = "20px Arial";
+        ctx.fillText(pred.class, pred.bbox[0], pred.bbox[1] - 5);
+      });
+
+      requestAnimationFrame(detectObjects);
+    }
+
+    // 🚀 Start everything
+    async function start() {
+      await startCamera();
+      await loadModel();
+    }
+
+    start();
   </script>
+
 </body>
 </html>
