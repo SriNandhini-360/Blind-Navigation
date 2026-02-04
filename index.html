@@ -23,7 +23,7 @@ let model;
 
 let lastSpokenObjects = [];
 let lastSpeakTime = 0;
-const speakDelay = 2000; // minimum 2 seconds between messages
+const speakDelay = 2000; // 2 seconds minimum between messages
 
 // English → Tamil mapping
 const tamilNames = {
@@ -33,7 +33,9 @@ const tamilNames = {
   dog: "நாய்",
   cat: "பூனை",
   tv: "டிவி",
-  table: "மேசை"
+  table: "மேசை",
+  laptop: "லேப்டாப்",
+  phone: "செல் போன்"
 };
 
 // Tamil Voice with repeat control
@@ -47,80 +49,10 @@ function speak(objects) {
   lastSpokenObjects = objects;
   lastSpeakTime = now;
 
-  const msg = new SpeechSynthesisUtterance("முன்னால் " + text + " உள்ளது");
+  const msg = new SpeechSynthesisUtterance("முன்னால் " + text);
   msg.lang = "ta-IN";
   window.speechSynthesis.speak(msg);
 }
 
 // Start Camera
-async function startCamera() {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "environment" },
-    audio: false
-  });
-  video.srcObject = stream;
-  return new Promise(resolve => { video.onloadedmetadata = () => resolve(); });
-}
-
-// Load Model
-async function loadModel() {
-  model = await cocoSsd.load();
-  speak(["கேமரா தயார். முன் உள்ள பொருட்களை கண்டறிகிறேன்"]);
-  detectObjects();
-}
-
-// Detect Objects
-async function detectObjects() {
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  const predictions = await model.detect(video);
-  const objectsToSpeak = [];
-
-  predictions.forEach(pred => {
-    const [x, y, width, height] = pred.bbox;
-
-    // Draw bounding boxes
-    ctx.strokeStyle = "lime";
-    ctx.lineWidth = 3;
-    ctx.strokeRect(x, y, width, height);
-    ctx.fillStyle = "lime";
-    ctx.font = "20px Arial";
-    ctx.fillText(pred.class, x, y - 5);
-
-    // Determine horizontal position
-    let horizontal = "";
-    const centerX = x + width/2;
-    if (centerX < canvas.width / 3) horizontal = "இடது பக்கம்";
-    else if (centerX > 2*canvas.width /3) horizontal = "வலது பக்கம்";
-    else horizontal = "முன்னே";
-
-    // Rough distance logic
-    let distanceMsg = "";
-    if (height > canvas.height / 2) distanceMsg = "மிக நெருக்கமாக உள்ளது. நிறுத்தவும்";
-    else if (height > canvas.height / 4) distanceMsg = "அருகில் உள்ளது. கவனமாக முன்னே செல்லவும்";
-    else distanceMsg = "முன்னே உள்ளது";
-
-    // Object name Tamil
-    const objTamil = tamilNames[pred.class] || pred.class;
-
-    objectsToSpeak.push(`${horizontal} ${objTamil} ${distanceMsg}`);
-  });
-
-  if(objectsToSpeak.length > 0){
-    speak(objectsToSpeak);
-  }
-
-  requestAnimationFrame(detectObjects);
-}
-
-// Start everything
-async function start() {
-  await startCamera();
-  await loadModel();
-}
-start();
-</script>
-</body>
-</html>
+async f
