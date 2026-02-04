@@ -55,4 +55,79 @@ function speak(objects) {
 }
 
 // Start Camera
-async f
+async function startCamera() {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "environment" },
+    audio: false
+  });
+  video.srcObject = stream;
+  return new Promise(resolve => { video.onloadedmetadata = () => resolve(); });
+}
+
+// Load Model
+async function loadModel() {
+  model = await cocoSsd.load();
+  speak(["கேமரா தயார். முன் உள்ள பொருட்களை கண்டறிகிறேன்"]);
+  detectObjects();
+}
+
+// Detect Objects
+async function detectObjects() {
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  const predictions = await model.detect(video);
+  const objectsToSpeak = [];
+  const spokenSet = new Set(); // to avoid duplicates
+
+  predictions.forEach(pred => {
+    const [x, y, width, height] = pred.bbox;
+
+    // Draw bounding boxes
+    ctx.strokeStyle = "lime";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x, y, width, height);
+    ctx.fillStyle = "lime";
+    ctx.font = "20px Arial";
+    ctx.fillText(pred.class, x, y - 5);
+
+    // Determine horizontal position
+    const centerX = x + width/2;
+    let horizontal = centerX < canvas.width / 3 ? "இடது பக்கம்" :
+                     centerX > 2*canvas.width / 3 ? "வலது பக்கம்" : "முன்னே";
+
+    // Rough distance logic
+    let distanceMsg = "";
+    if (height > canvas.height / 2) distanceMsg = "மிக நெருக்கமாக உள்ளது. நிறுத்தவும்";
+    else if (height > canvas.height / 4) distanceMsg = "அருகில் உள்ளது. கவனமாக முன்னே செல்லவும்";
+    else distanceMsg = "உள்ளது";
+
+    // Respectable form for humans
+    const objTamil = tamilNames[pred.class] || pred.class;
+    const politeDistance = pred.class === "person" ? distanceMsg.replace("உள்ளது", "உள்ளார்") : distanceMsg;
+
+    // Unique key to avoid duplicate mentions
+    const key = `${horizontal}-${objTamil}`;
+    if (!spokenSet.has(key)) {
+      spokenSet.add(key);
+      objectsToSpeak.push(`${horizontal} ${objTamil} ${politeDistance}`);
+    }
+  });
+
+  if(objectsToSpeak.length > 0){
+    speak(objectsToSpeak);
+  }
+
+  requestAnimationFrame(detectObjects);
+}
+
+// Start everything
+async function start() {
+  await startCamera();
+  await loadModel();
+}
+start();
+</script>
+</body>
+</html>
