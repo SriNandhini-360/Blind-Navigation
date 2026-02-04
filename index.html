@@ -2,116 +2,122 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Blind Assistance - Live Object Detection</title>
-
-  <!-- TensorFlow.js -->
+  <title>Blind Assistance - Tamil Navigation</title>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
-
-  <!-- COCO-SSD model -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
-
   <style>
-    body {
-      margin: 0;
-      background: black;
-      overflow: hidden;
-    }
-
-    video {
-      width: 100vw;
-      height: 100vh;
-      object-fit: cover;
-    }
-
-    canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-    }
+    body { margin: 0; background: black; overflow: hidden; }
+    video { width: 100vw; height: 100vh; object-fit: cover; }
+    canvas { position: absolute; top: 0; left: 0; }
   </style>
 </head>
-
 <body>
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas"></canvas>
 
-  <video id="video" autoplay playsinline></video>
-  <canvas id="canvas"></canvas>
+<script>
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+let model;
 
-  <script>
-    const video = document.getElementById("video");
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
+let lastMessage = "";
+let lastSpeakTime = 0;
+const speakDelay = 2000;
 
-    let model;
-    let lastSpoken = "";
+// English → Tamil mapping
+const tamilNames = {
+  person: "மனிதர்",
+  chair: "நாற்காலி",
+  bottle: "பாட்டில்",
+  dog: "நாய்",
+  cat: "பூனை",
+  tv: "டிவி",
+  table: "மேசை"
+};
 
-    // 🎤 Tamil voice
-    function speak(text) {
-      if (text === lastSpoken) return;
-      lastSpoken = text;
+// Tamil Voice
+function speak(text) {
+  const now = Date.now();
+  if (now - lastSpeakTime < speakDelay) return;
+  if (text === lastMessage) return;
+  lastMessage = text;
+  lastSpeakTime = now;
+  const msg = new SpeechSynthesisUtterance(text);
+  msg.lang = "ta-IN";
+  window.speechSynthesis.speak(msg);
+}
 
-      const msg = new SpeechSynthesisUtterance(text);
-      msg.lang = "ta-IN";
-      window.speechSynthesis.speak(msg);
-    }
+// Start Camera
+async function startCamera() {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "environment" },
+    audio: false
+  });
+  video.srcObject = stream;
+  return new Promise(resolve => { video.onloadedmetadata = () => resolve(); });
+}
 
-    // 📷 Start camera
-    async function startCamera() {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-        audio: false
-      });
+// Load Model
+async function loadModel() {
+  model = await cocoSsd.load();
+  speak("கேமரா தயார். முன் உள்ள பொருட்களை கண்டறிகிறேன்");
+  detectObjects();
+}
 
-      video.srcObject = stream;
+// Detect Objects
+async function detectObjects() {
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
-      return new Promise(resolve => {
-        video.onloadedmetadata = () => {
-          resolve();
-        };
-      });
-    }
+  const predictions = await model.detect(video);
 
-    // 🤖 Load model
-    async function loadModel() {
-      model = await cocoSsd.load();
-      speak("கேமரா தயார். முன் உள்ள பொருட்களை கண்டறிகிறேன்");
-      detectObjects();
-    }
+  const instructions = [];
 
-    // 👀 Detect objects
-    async function detectObjects() {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+  predictions.forEach(pred => {
+    const [x, y, width, height] = pred.bbox;
 
-      const predictions = await model.detect(video);
+    // Draw bounding boxes
+    ctx.strokeStyle = "lime";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x, y, width, height);
+    ctx.fillStyle = "lime";
+    ctx.font = "20px Arial";
+    ctx.fillText(pred.class, x, y - 5);
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Determine horizontal position
+    let horizontal = "";
+    const centerX = x + width/2;
+    if (centerX < canvas.width / 3) horizontal = "இடது பக்கம்";
+    else if (centerX > 2*canvas.width /3) horizontal = "வலது பக்கம்";
+    else horizontal = "முன்னே";
 
-      if (predictions.length > 0) {
-        const objectName = predictions[0].class;
-        speak("முன்னால் " + objectName + " உள்ளது");
-      }
+    // Rough distance logic
+    let distanceMsg = "";
+    if (height > canvas.height / 2) distanceMsg = "மிக நெருக்கமாக உள்ளது. நிறுத்தவும்";
+    else if (height > canvas.height / 4) distanceMsg = "அருகில் உள்ளது. கவனமாக முன்னே செல்லவும்";
+    else distanceMsg = "முன்னே உள்ளது";
 
-      predictions.forEach(pred => {
-        ctx.strokeStyle = "lime";
-        ctx.lineWidth = 3;
-        ctx.strokeRect(...pred.bbox);
+    // Object name Tamil
+    const objTamil = tamilNames[pred.class] || pred.class;
 
-        ctx.fillStyle = "lime";
-        ctx.font = "20px Arial";
-        ctx.fillText(pred.class, pred.bbox[0], pred.bbox[1] - 5);
-      });
+    instructions.push(`${horizontal} ${objTamil} ${distanceMsg}`);
+  });
 
-      requestAnimationFrame(detectObjects);
-    }
+  if(instructions.length > 0){
+    speak(instructions.join(". "));
+  }
 
-    // 🚀 Start everything
-    async function start() {
-      await startCamera();
-      await loadModel();
-    }
+  requestAnimationFrame(detectObjects);
+}
 
-    start();
-  </script>
-
+// Start everything
+async function start() {
+  await startCamera();
+  await loadModel();
+}
+start();
+</script>
 </body>
 </html>
