@@ -41,15 +41,15 @@ const tamilNames = {
 // Tamil Voice with repeat control
 function speak(objects) {
   const now = Date.now();
-  if (now - lastSpeakTime < speakDelay) return; // avoid rapid repeats
+  if (now - lastSpeakTime < speakDelay) return;
 
-  const text = objects.join(", ");
-  if (text === lastSpokenObjects.join(", ")) return; // avoid same message
+  const text = objects.join(". ");
+  if (text === lastSpokenObjects.join(". ")) return;
 
   lastSpokenObjects = objects;
   lastSpeakTime = now;
 
-  const msg = new SpeechSynthesisUtterance("முன்னால் " + text);
+  const msg = new SpeechSynthesisUtterance(text); // removed extra "முன்னால்"
   msg.lang = "ta-IN";
   window.speechSynthesis.speak(msg);
 }
