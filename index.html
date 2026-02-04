@@ -1,48 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Blind Navigation</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.16.0/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+  <meta charset="UTF-8" />
+  <title>Live Object Detection</title>
 
-</head>
-<body>
-  <h1>Blind Navigation Demo</h1>
-  <video id="camera" width="320" height="240" autoplay></video>
+  <!-- TensorFlow.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0"></script>
 
-  <!-- Button to manually test Tamil voice -->
-  <button onclick="speakTamil('முன்னே செல்லலாம்')">Test Voice</button>
+  <!-- COCO-SSD model -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
-  <script>
-    let model;
-
-async function loadModel() {
-  model = await cocoSsd.load();
-  console.log("✅ AI Model Loaded");
-  speakTamil("AI மாடல் தயாராக உள்ளது");
-}
-
-window.onload = () => {
-  loadModel();
-};
-
-    // Access camera (back if available)
-    const video = document.getElementById('camera');
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-      .then(stream => { video.srcObject = stream; })
-      .catch(err => { alert("Camera permission required!"); });
-
-    // Function to speak Tamil
-    function speakTamil(text){
-      const msg = new SpeechSynthesisUtterance(text);
-      msg.lang = "ta-IN";
-      window.speechSynthesis.speak(msg);
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      text-align: center;
+      font-family: Arial, sans-serif;
+      background: #000;
+      color: #fff;
     }
 
-    // Optional auto-test: speaks after 3 sec
-    setTimeout(() => { speakTamil("முன்னே செல்லலாம்"); }, 3000);
-  </script>
-</body>
-</html>
+    video {
+      width: 100%;
+      height: auto;
+    }
 
+    #output {
+      font-size: 20px;
+      padding: 10px;
+      background: rgba(0,0,0,0.7);
+    }
+  </style>
+</head>
+
+<body>
+
+  <h2>Live Object Detection</h2>
+
+  <video id="video" autoplay muted></video>
+
+  <div id="output">Loading model...</div>
+
+  <script>
+    const video = document.getElementById("video");
+    const output = document.getElementById("output");
+
+    // Start camera
+    async function startCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }
+      });
+      video.srcObject = stream;
+    }
+
+    // Load model and detect objects
+    async function startDetection() {
+      const model = await cocoSsd.load();
+      output.innerText = "Model loaded. Detecting...";
+
+      setInterval(async () => {
+        const predictions = await model.detect(video);
