@@ -1,51 +1,36 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Live Object Detection</title>
+  <title>Blind Navigation</title>
 
-  <!-- TensorFlow.js -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0"></script>
-
-  <!-- COCO-SSD model -->
+  <!-- TensorFlow -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.2.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
   <style>
     body {
-      margin: 0;
-      padding: 0;
+      background: black;
+      color: white;
       text-align: center;
-      font-family: Arial, sans-serif;
-      background: #000;
-      color: #fff;
+      font-family: Arial;
     }
-
     video {
       width: 100%;
       height: auto;
-    }
-
-    #output {
-      font-size: 20px;
-      padding: 10px;
-      background: rgba(0,0,0,0.7);
     }
   </style>
 </head>
 
 <body>
-
   <h2>Live Object Detection</h2>
+  <p id="status">Loading model...</p>
 
-  <video id="video" autoplay muted></video>
-
-  <div id="output">Loading model...</div>
+  <video id="video" autoplay playsinline></video>
 
   <script>
     const video = document.getElementById("video");
-    const output = document.getElementById("output");
+    const statusText = document.getElementById("status");
 
-    // Start camera
     async function startCamera() {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" }
@@ -53,10 +38,22 @@
       video.srcObject = stream;
     }
 
-    // Load model and detect objects
-    async function startDetection() {
+    async function loadModel() {
       const model = await cocoSsd.load();
-      output.innerText = "Model loaded. Detecting...";
+      statusText.innerText = "Model loaded. Detecting...";
 
       setInterval(async () => {
         const predictions = await model.detect(video);
+        if (predictions.length > 0) {
+          statusText.innerText = "Detected: " + predictions[0].class;
+        } else {
+          statusText.innerText = "No object detected";
+        }
+      }, 1500);
+    }
+
+    startCamera();
+    loadModel();
+  </script>
+</body>
+</html>
