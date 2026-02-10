@@ -1,133 +1,132 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ta">
 <head>
   <meta charset="UTF-8" />
-  <title>Blind Assistance - Tamil Navigation</title>
+  <title>Blind Navigation - Live Assistant</title>
+
+  <!-- TensorFlow -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+
   <style>
-    body { margin: 0; background: black; overflow: hidden; }
-    video { width: 100vw; height: 100vh; object-fit: cover; }
-    canvas { position: absolute; top: 0; left: 0; }
+    body {
+      margin: 0;
+      background: black;
+      overflow: hidden;
+    }
+
+    video {
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
   </style>
 </head>
+
 <body>
-<video id="video" autoplay playsinline></video>
-<canvas id="canvas"></canvas>
 
-<script>
-const video = document.getElementById("video");
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
-let model;
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvas"></canvas>
 
-let lastSpokenObjects = [];
-let lastSpeakTime = 0;
-const speakDelay = 2000; // 2 seconds minimum between messages
+  <script>
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
 
-// English → Tamil mapping
-const tamilNames = {
-  person: "மனிதர்",
-  chair: "நாற்காலி",
-  bottle: "பாட்டில்",
-  dog: "நாய்",
-  cat: "பூனை",
-  tv: "டிவி",
-  table: "மேசை",
-  laptop: "லேப்டாப்",
-  phone: "செல் போன்"
-};
+    let model;
+    let lastSpoken = "";
 
-// Tamil Voice with repeat control
-function speak(objects) {
-  const now = Date.now();
-  if (now - lastSpeakTime < speakDelay) return;
+    // 🔊 Tamil voice function
+    function speak(text) {
+      if (text === lastSpoken) return;
+      lastSpoken = text;
 
-  const text = objects.join(". ");
-  if (text === lastSpokenObjects.join(". ")) return;
-
-  lastSpokenObjects = objects;
-  lastSpeakTime = now;
-
-  const msg = new SpeechSynthesisUtterance(text); // NO extra "முன்னால்"
-  msg.lang = "ta-IN";
-  window.speechSynthesis.speak(msg);
-}
-
-// Start Camera
-async function startCamera() {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "environment" },
-    audio: false
-  });
-  video.srcObject = stream;
-  return new Promise(resolve => { video.onloadedmetadata = () => resolve(); });
-}
-
-// Load Model
-async function loadModel() {
-  model = await cocoSsd.load();
-  speak(["கேமரா தயார். முன் உள்ள பொருட்களை கண்டறிகிறேன்"]);
-  detectObjects();
-}
-
-// Detect Objects
-async function detectObjects() {
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  const predictions = await model.detect(video);
-  const objectsToSpeak = [];
-  const spokenSet = new Set(); // to avoid duplicates
-
-  predictions.forEach(pred => {
-    const [x, y, width, height] = pred.bbox;
-
-    // Draw bounding boxes
-    ctx.strokeStyle = "lime";
-    ctx.lineWidth = 3;
-    ctx.strokeRect(x, y, width, height);
-    ctx.fillStyle = "lime";
-    ctx.font = "20px Arial";
-    ctx.fillText(pred.class, x, y - 5);
-
-    // Determine horizontal position
-    const centerX = x + width/2;
-    let horizontal = centerX < canvas.width / 3 ? "இடது பக்கம்" :
-                     centerX > 2*canvas.width / 3 ? "வலது பக்கம்" : "முன்ன்"; // FIXED here
-
-    // Rough distance logic
-    let distanceMsg = "";
-    if (height > canvas.height / 2) distanceMsg = "மிக நெருக்கமாக உள்ளது. நிறுத்தவும்";
-    else if (height > canvas.height / 4) distanceMsg = "அருகில் உள்ளது. கவனமாக முன்னே செல்லவும்";
-    else distanceMsg = "உள்ளது";
-
-    // Respectable form for humans
-    const objTamil = tamilNames[pred.class] || pred.class;
-    const politeDistance = pred.class === "person" ? distanceMsg.replace("உள்ளது", "உள்ளார்") : distanceMsg;
-
-    // Unique key to avoid duplicate mentions
-    const key = `${horizontal}-${objTamil}`;
-    if (!spokenSet.has(key)) {
-      spokenSet.add(key);
-      objectsToSpeak.push(`${horizontal} ${objTamil} ${politeDistance}`);
+      window.speechSynthesis.cancel();
+      const msg = new SpeechSynthesisUtterance(text);
+      msg.lang = "ta-IN";
+      msg.rate = 1;
+      window.speechSynthesis.speak(msg);
     }
-  });
 
-  if(objectsToSpeak.length > 0){
-    speak(objectsToSpeak);
-  }
+    // 📷 Camera start
+    async function startCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+        audio: false
+      });
 
-  requestAnimationFrame(detectObjects);
-}
+      video.srcObject = stream;
 
-// Start everything
-async function start() {
-  await startCamera();
-  await loadModel();
-}
-start();
-</script>
+      return new Promise(resolve => {
+        video.onloadedmetadata = () => resolve();
+      });
+    }
+
+    // 🤖 Load AI model
+    async function loadModel() {
+      model = await cocoSsd.load();
+      speak("கேமரா தயார். வழிகாட்டல் தொடங்கியது");
+      detectObjects();
+    }
+
+    // 👀 Object detection + navigation logic
+    async function detectObjects() {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      const predictions = await model.detect(video);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      let command = "முன்னால் பாதை சுத்தமாக உள்ளது";
+
+      if (predictions.length > 0) {
+        // Take biggest object
+        const obj = predictions.reduce((a, b) =>
+          a.bbox[2] * a.bbox[3] > b.bbox[2] * b.bbox[3] ? a : b
+        );
+
+        const [x, y, width, height] = obj.bbox;
+        const centerX = x + width / 2;
+        const screenWidth = canvas.width;
+
+        if (centerX < screenWidth / 3) {
+          command = "இடப்பக்கம் தடையுள்ளது, வலப்பக்கம் நகரவும்";
+        } 
+        else if (centerX < (2 * screenWidth) / 3) {
+          command = "முன்னால் தடையுள்ளது, தயவு செய்து நிறுத்தவும்";
+        } 
+        else {
+          command = "வலப்பக்கம் தடையுள்ளது, இடப்பக்கம் நகரவும்";
+        }
+
+        // Draw box
+        ctx.strokeStyle = "lime";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x, y, width, height);
+
+        ctx.fillStyle = "lime";
+        ctx.font = "18px Arial";
+        ctx.fillText(obj.class, x, y - 5);
+      }
+
+      speak(command);
+      requestAnimationFrame(detectObjects);
+    }
+
+    // 🚀 Start everything
+    async function start() {
+      await startCamera();
+      await loadModel();
+    }
+
+    start();
+  </script>
+
 </body>
 </html>
