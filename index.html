@@ -7,7 +7,7 @@
   <!-- TensorFlow.js -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
 
-  <!-- COCO-SSD -->
+  <!-- COCO-SSD Model -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
   <style>
@@ -43,15 +43,19 @@
 
     let model;
 
-    // 🔇 Voice control
+    // 🔊 Voice control
     let lastMessage = "";
     let lastSpeakTime = 0;
-    const SPEAK_DELAY = 3000; // 3 seconds gap
+    const SPEAK_DELAY = 3000; // 3 sec gap
 
-    // 🗣️ Tamil voice
+    // 🧠 Stability control
+    let stableCount = 0;
+    let lastStableMessage = "";
+    const STABLE_FRAMES = 10; // must be same for 10 frames
+
+    // 🗣️ Speak Tamil safely
     function speak(text) {
       const now = Date.now();
-
       if (text === lastMessage) return;
       if (now - lastSpeakTime < SPEAK_DELAY) return;
 
@@ -65,7 +69,7 @@
       window.speechSynthesis.speak(msg);
     }
 
-    // 🌐 English → Tamil object names
+    // 🌐 English → Tamil
     function toTamil(label) {
       const map = {
         person: "மனிதர்",
@@ -80,13 +84,12 @@
       return map[label] || label;
     }
 
-    // 📷 Start camera
+    // 📷 Camera start
     async function startCamera() {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
         audio: false
       });
-
       video.srcObject = stream;
 
       return new Promise(resolve => {
@@ -94,14 +97,14 @@
       });
     }
 
-    // 🤖 Load AI model
+    // 🤖 Load AI
     async function loadModel() {
       model = await cocoSsd.load();
       speak("கேமரா தயார். சுற்றுப்புறம் கண்காணிக்கப்படுகிறது");
       detectObjects();
     }
 
-    // 👀 Object detection loop
+    // 👀 Real-time detection with stability
     async function detectObjects() {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -109,21 +112,38 @@
       const predictions = await model.detect(video);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      let currentMessage = "";
+
       if (predictions.length > 0) {
-        const obj = predictions[0];
-        const [x, , w] = obj.bbox;
+        const obj = predictions.sort((a, b) => b.score - a.score)[0];
 
-        const centerX = x + w / 2;
-        const screenW = canvas.width;
+        if (obj.score > 0.6) {
+          const [x, , w] = obj.bbox;
+          const centerX = x + w / 2;
+          const screenW = canvas.width;
 
-        let direction = "முன்னால்";
-        if (centerX < screenW / 3) direction = "இடப்பக்கம்";
-        else if (centerX > (2 * screenW) / 3) direction = "வலப்பக்கம்";
+          let direction = "முன்னால்";
+          if (centerX < screenW / 3) direction = "இடப்பக்கம்";
+          else if (centerX > (2 * screenW) / 3) direction = "வலப்பக்கம்";
 
-        const tamilObject = toTamil(obj.class);
-        speak(`${direction} ${tamilObject} உள்ளது`);
+          const tamilObject = toTamil(obj.class);
+          currentMessage = `${direction} ${tamilObject} உள்ளது`;
+        }
       } else {
-        speak("முன்னால் பாதை சுத்தமாக உள்ளது");
+        currentMessage = "முன்னால் பாதை சுத்தமாக உள்ளது";
+      }
+
+      // 🧠 Stability check
+      if (currentMessage === lastStableMessage) {
+        stableCount++;
+      } else {
+        stableCount = 0;
+        lastStableMessage = currentMessage;
+      }
+
+      // 🗣️ Speak only if stable
+      if (stableCount === STABLE_FRAMES) {
+        speak(currentMessage);
       }
 
       // 🖍️ Draw boxes
@@ -131,7 +151,6 @@
         ctx.strokeStyle = "lime";
         ctx.lineWidth = 3;
         ctx.strokeRect(...p.bbox);
-
         ctx.fillStyle = "lime";
         ctx.font = "18px Arial";
         ctx.fillText(p.class, p.bbox[0], p.bbox[1] - 5);
@@ -140,7 +159,7 @@
       requestAnimationFrame(detectObjects);
     }
 
-    // 🚀 Start system
+    // 🚀 Start everything
     async function start() {
       await startCamera();
       await loadModel();
