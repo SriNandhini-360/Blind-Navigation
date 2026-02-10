@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="ta">
 <head>
-  <meta charset="UTF-8" />
-  <title>Blind Navigation - Live Assistant</title>
+  <meta charset="UTF-8">
+  <title>Blind Navigation – Live Object Detection</title>
 
-  <!-- TensorFlow -->
+  <!-- TensorFlow.js -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+
+  <!-- COCO-SSD Model -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
   <style>
@@ -40,12 +42,12 @@
     const ctx = canvas.getContext("2d");
 
     let model;
-    let lastSpoken = "";
+    let lastMessage = "";
 
-    // 🔊 Tamil voice function
+    // 🗣️ Tamil Voice
     function speak(text) {
-      if (text === lastSpoken) return;
-      lastSpoken = text;
+      if (text === lastMessage) return;
+      lastMessage = text;
 
       window.speechSynthesis.cancel();
       const msg = new SpeechSynthesisUtterance(text);
@@ -54,7 +56,22 @@
       window.speechSynthesis.speak(msg);
     }
 
-    // 📷 Camera start
+    // 📖 English → Tamil mapping
+    function toTamil(label) {
+      const map = {
+        person: "மனிதர்",
+        chair: "நாற்காலி",
+        bottle: "பாட்டில்",
+        phone: "கைபேசி",
+        cup: "கோப்பை",
+        laptop: "மடிக்கணினி",
+        table: "மேசை",
+        book: "புத்தகம்"
+      };
+      return map[label] || label;
+    }
+
+    // 📷 Start Camera
     async function startCamera() {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
@@ -64,18 +81,18 @@
       video.srcObject = stream;
 
       return new Promise(resolve => {
-        video.onloadedmetadata = () => resolve();
+        video.onloadedmetadata = resolve;
       });
     }
 
-    // 🤖 Load AI model
+    // 🤖 Load Model
     async function loadModel() {
       model = await cocoSsd.load();
-      speak("கேமரா தயார். வழிகாட்டல் தொடங்கியது");
+      speak("கேமரா தயார். சுற்றுப்புறம் கண்காணிக்கப்படுகிறது");
       detectObjects();
     }
 
-    // 👀 Object detection + navigation logic
+    // 👀 Detect Objects
     async function detectObjects() {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -83,43 +100,34 @@
       const predictions = await model.detect(video);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      let command = "முன்னால் பாதை சுத்தமாக உள்ளது";
-
       if (predictions.length > 0) {
-        // Take biggest object
-        const obj = predictions.reduce((a, b) =>
-          a.bbox[2] * a.bbox[3] > b.bbox[2] * b.bbox[3] ? a : b
-        );
+        const obj = predictions[0];
+        const [x, , w] = obj.bbox;
+        const centerX = x + w / 2;
+        const screenW = canvas.width;
 
-        const [x, y, width, height] = obj.bbox;
-        const centerX = x + width / 2;
-        const screenWidth = canvas.width;
+        let direction = "முன்னால்";
+        if (centerX < screenW / 3) direction = "இடப்பக்கம்";
+        else if (centerX > (2 * screenW) / 3) direction = "வலப்பக்கம்";
 
-        if (centerX < screenWidth / 3) {
-          command = "இடப்பக்கம் தடையுள்ளது, வலப்பக்கம் நகரவும்";
-        } 
-        else if (centerX < (2 * screenWidth) / 3) {
-          command = "முன்னால் தடையுள்ளது, தயவு செய்து நிறுத்தவும்";
-        } 
-        else {
-          command = "வலப்பக்கம் தடையுள்ளது, இடப்பக்கம் நகரவும்";
-        }
+        const tamilObject = toTamil(obj.class);
+        speak(`${direction} ${tamilObject} உள்ளது`);
+      }
 
-        // Draw box
+      predictions.forEach(p => {
         ctx.strokeStyle = "lime";
         ctx.lineWidth = 3;
-        ctx.strokeRect(x, y, width, height);
+        ctx.strokeRect(...p.bbox);
 
         ctx.fillStyle = "lime";
         ctx.font = "18px Arial";
-        ctx.fillText(obj.class, x, y - 5);
-      }
+        ctx.fillText(p.class, p.bbox[0], p.bbox[1] - 5);
+      });
 
-      speak(command);
       requestAnimationFrame(detectObjects);
     }
 
-    // 🚀 Start everything
+    // 🚀 Start Everything
     async function start() {
       await startCamera();
       await loadModel();
