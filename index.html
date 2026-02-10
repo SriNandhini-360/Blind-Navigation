@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="ta">
 <head>
-  <meta charset="UTF-8">
-  <title>Blind Navigation – Live Object Detection</title>
+  <meta charset="UTF-8" />
+  <title>Blind Navigation – Live Assistance</title>
 
   <!-- TensorFlow.js -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
 
-  <!-- COCO-SSD Model -->
+  <!-- COCO-SSD -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
   <style>
@@ -42,12 +42,21 @@
     const ctx = canvas.getContext("2d");
 
     let model;
-    let lastMessage = "";
 
-    // 🗣️ Tamil Voice
+    // 🔇 Voice control
+    let lastMessage = "";
+    let lastSpeakTime = 0;
+    const SPEAK_DELAY = 3000; // 3 seconds gap
+
+    // 🗣️ Tamil voice
     function speak(text) {
+      const now = Date.now();
+
       if (text === lastMessage) return;
+      if (now - lastSpeakTime < SPEAK_DELAY) return;
+
       lastMessage = text;
+      lastSpeakTime = now;
 
       window.speechSynthesis.cancel();
       const msg = new SpeechSynthesisUtterance(text);
@@ -56,7 +65,7 @@
       window.speechSynthesis.speak(msg);
     }
 
-    // 📖 English → Tamil mapping
+    // 🌐 English → Tamil object names
     function toTamil(label) {
       const map = {
         person: "மனிதர்",
@@ -71,7 +80,7 @@
       return map[label] || label;
     }
 
-    // 📷 Start Camera
+    // 📷 Start camera
     async function startCamera() {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
@@ -85,14 +94,14 @@
       });
     }
 
-    // 🤖 Load Model
+    // 🤖 Load AI model
     async function loadModel() {
       model = await cocoSsd.load();
       speak("கேமரா தயார். சுற்றுப்புறம் கண்காணிக்கப்படுகிறது");
       detectObjects();
     }
 
-    // 👀 Detect Objects
+    // 👀 Object detection loop
     async function detectObjects() {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -103,6 +112,7 @@
       if (predictions.length > 0) {
         const obj = predictions[0];
         const [x, , w] = obj.bbox;
+
         const centerX = x + w / 2;
         const screenW = canvas.width;
 
@@ -112,8 +122,11 @@
 
         const tamilObject = toTamil(obj.class);
         speak(`${direction} ${tamilObject} உள்ளது`);
+      } else {
+        speak("முன்னால் பாதை சுத்தமாக உள்ளது");
       }
 
+      // 🖍️ Draw boxes
       predictions.forEach(p => {
         ctx.strokeStyle = "lime";
         ctx.lineWidth = 3;
@@ -127,7 +140,7 @@
       requestAnimationFrame(detectObjects);
     }
 
-    // 🚀 Start Everything
+    // 🚀 Start system
     async function start() {
       await startCamera();
       await loadModel();
